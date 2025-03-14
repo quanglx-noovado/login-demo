@@ -48,8 +48,8 @@
         <p class="modal-description">Vui lòng xác thực thiết bị này bằng mã OTP</p>
         
         <!-- OTP Status -->
-        <div v-if="otpStatus" :class="['otp-status', otpStatus.type]">
-          {{ otpStatus.message }}
+        <div v-if="newDeviceOtpStatus" :class="['otp-status', newDeviceOtpStatus.type]">
+          {{ newDeviceOtpStatus.message }}
         </div>
 
         <!-- Send OTP Section -->
@@ -57,14 +57,10 @@
           <p class="email-info">Gửi mã xác thực đến: {{ email }}</p>
           <button 
             @click="handleSendOtp" 
-            :disabled="isLoadingSendOtp || otpCooldown > 0"
+            :disabled="isLoadingSendOtp"
             class="secondary-button"
           >
-            {{ 
-              isLoadingSendOtp ? 'Đang gửi...' : 
-              otpCooldown > 0 ? `Gửi lại sau ${otpCooldown}s` :
-              'Gửi lại mã OTP'
-            }}
+            {{ isLoadingSendOtp ? 'Đang gửi...' : 'Gửi lại mã OTP' }}
           </button>
         </div>
 
@@ -73,7 +69,7 @@
           <div class="form-group">
             <label>Nhập mã OTP (6 số)</label>
             <input 
-              v-model="otp" 
+              v-model="newDeviceOtp" 
               type="text"
               pattern="\d{6}"
               maxlength="6"
@@ -93,7 +89,7 @@
             </button>
             <button 
               type="submit" 
-              :disabled="isLoadingVerify || otp.length !== 6"
+              :disabled="isLoadingVerify || newDeviceOtp.length !== 6"
             >
               {{ isLoadingVerify ? 'Đang xác thực...' : 'Xác thực' }}
             </button>
@@ -143,8 +139,8 @@
 
         <!-- OTP Section -->
         <div v-if="selectedDevices.length > 0" class="otp-section">
-          <div v-if="otpStatus" :class="['otp-status', otpStatus.type]">
-            {{ otpStatus.message }}
+          <div v-if="deviceListOtpStatus" :class="['otp-status', deviceListOtpStatus.type]">
+            {{ deviceListOtpStatus.message }}
           </div>
 
           <p class="email-info">
@@ -154,21 +150,17 @@
           
           <button 
             @click="handleSendOtp(2)" 
-            :disabled="selectedDevices.length === 0"
+            :disabled="selectedDevices.length === 0 || isLoadingSendOtp"
             :class="['otp-button', selectedDevices.length > 0 ? 'active' : 'disabled']"
           >
-            {{ 
-              isLoadingSendOtp ? 'Đang gửi...' : 
-              otpCooldown > 0 ? `Gửi lại sau ${otpCooldown}s` :
-              'Gửi mã OTP'
-            }}
+            {{ isLoadingSendOtp ? 'Đang gửi...' : 'Gửi mã OTP' }}
           </button>
 
           <!-- Verify Form -->
-          <form v-if="showOtpInput" @submit.prevent="handleRemoveDevices" class="verify-form">
+          <form v-if="showDeviceListOtpInput" @submit.prevent="handleRemoveDevices" class="verify-form">
             <div class="form-group">
               <input 
-                v-model="otp" 
+                v-model="deviceListOtp" 
                 type="text"
                 pattern="\d{6}"
                 maxlength="6"
@@ -188,7 +180,7 @@
               </button>
               <button 
                 type="submit" 
-                :disabled="isLoadingVerify || otp.length !== 6"
+                :disabled="isLoadingVerify || deviceListOtp.length !== 6"
                 class="primary-button"
               >
                 {{ isLoadingVerify ? 'Đang xác thực...' : 'Xác nhận gỡ bỏ' }}
@@ -219,13 +211,22 @@ const showOtpModal = ref(false)
 const isLoadingSendOtp = ref(false)
 const isLoadingVerify = ref(false)
 const successMessage = ref('')
-const otpStatus = ref<{ type: 'success' | 'error', message: string } | null>(null)
-const otpCooldown = ref(0)
 const isLoggedIn = ref(false)
 const showDeviceListModal = ref(false)
 const selectedDevices = ref<string[]>([])
-const showOtpInput = ref(false)
+const showNewDeviceOtpInput = ref(false)
 const activeDevices = ref([])
+
+// Tách riêng các biến cho modal new device
+const newDeviceOtpStatus = ref<{ type: 'success' | 'error', message: string } | null>(null)
+
+// Tách riêng các biến cho modal device list
+const deviceListOtpStatus = ref<{ type: 'success' | 'error', message: string } | null>(null)
+const showDeviceListOtpInput = ref(false)
+
+// Tách biến otp thành hai biến riêng
+const newDeviceOtp = ref('')
+const deviceListOtp = ref('')
 
 const router = useRouter()
 
@@ -241,19 +242,9 @@ const clearError = () => {
 
 const closeOtpModal = () => {
   showOtpModal.value = false
-  otp.value = ''
-  otpStatus.value = null
-}
-
-const startOtpCooldown = () => {
-  otpCooldown.value = 60 // 60 seconds cooldown
-  const timer = setInterval(() => {
-    if (otpCooldown.value > 0) {
-      otpCooldown.value--
-    } else {
-      clearInterval(timer)
-    }
-  }, 1000)
+  newDeviceOtp.value = ''
+  newDeviceOtpStatus.value = null
+  showNewDeviceOtpInput.value = false
 }
 
 const formatDate = (dateString: string) => {
@@ -317,7 +308,11 @@ const handleLogin = async () => {
 const handleSendOtp = async (purpose = 1) => {
   try {
     isLoadingSendOtp.value = true
-    otpStatus.value = null
+    if (purpose === 1) {
+      newDeviceOtpStatus.value = null
+    } else {
+      deviceListOtpStatus.value = null
+    }
 
     const formData = new FormData()
     formData.append('email', email.value)
@@ -328,20 +323,30 @@ const handleSendOtp = async (purpose = 1) => {
     await axiosInstance.post('/api/v1/send-otp', formData)
     
     setTimeout(() => {
-      otpStatus.value = {
-        type: 'success',
-        message: 'Mã OTP đã được gửi thành công!'
+      if (purpose === 1) {
+        newDeviceOtpStatus.value = {
+          type: 'success',
+          message: 'Mã OTP đã được gửi thành công!'
+        }
+        showNewDeviceOtpInput.value = true
+      } else {
+        deviceListOtpStatus.value = {
+          type: 'success',
+          message: 'Mã OTP đã được gửi thành công!'
+        }
+        showDeviceListOtpInput.value = true
       }
-      startOtpCooldown()
-      showOtpInput.value = true
     }, 500)
   } catch (error) {
     setTimeout(() => {
-      otpStatus.value = {
-        type: 'error',
-        message: error.response?.data?.message === 'Too many requests' 
-          ? 'Bạn đã yêu cầu OTP quá nhiều lần. Vui lòng thử lại sau 1 giờ.'
-          : error.response?.data?.message || 'Không thể gửi mã OTP. Vui lòng thử lại.'
+      const errorMessage = error.response?.data?.message === 'Too many requests' 
+        ? 'Bạn đã yêu cầu OTP quá nhiều lần. Vui lòng thử lại sau 1 giờ.'
+        : error.response?.data?.message || 'Không thể gửi mã OTP. Vui lòng thử lại.'
+      
+      if (purpose === 1) {
+        newDeviceOtpStatus.value = { type: 'error', message: errorMessage }
+      } else {
+        deviceListOtpStatus.value = { type: 'error', message: errorMessage }
       }
     }, 500)
   } finally {
@@ -352,16 +357,17 @@ const handleSendOtp = async (purpose = 1) => {
 const handleVerifyOtp = async () => {
   try {
     isLoadingVerify.value = true
-    otpStatus.value = null
     errorMessage.value = ''
 
     const formData = new FormData()
-    formData.append('otp_code', otp.value)
+    formData.append('otp_code', newDeviceOtp.value)
     formData.append('device_token', deviceToken.value)
 
     const verifyResponse = await axiosInstance.post('/api/v1/verify-new-device', formData)
     
     if (verifyResponse.data.success) {
+      newDeviceOtp.value = '' // Clear OTP khi verify thành công
+      
       // Sau khi verify thành công, gọi lại API login
       const loginFormData = new FormData()
       loginFormData.append('email', email.value)
@@ -393,7 +399,7 @@ const handleVerifyOtp = async () => {
       }
     }
   } catch (error) {
-    otpStatus.value = {
+    newDeviceOtpStatus.value = {
       type: 'error',
       message: error.response?.data?.message === 'Invalid OTP'
         ? 'Mã OTP không chính xác. Vui lòng kiểm tra lại.'
@@ -407,21 +413,20 @@ const handleVerifyOtp = async () => {
 const closeDeviceListModal = () => {
   showDeviceListModal.value = false
   selectedDevices.value = []
-  showOtpInput.value = false
-  otp.value = ''
-  otpStatus.value = null
+  showDeviceListOtpInput.value = false
+  deviceListOtpStatus.value = null
+  deviceListOtp.value = ''
 }
 
 const handleRemoveDevices = async () => {
   try {
     isLoadingVerify.value = true
-    otpStatus.value = null
+    errorMessage.value = ''
 
     const formData = new FormData()
-    formData.append('otp_code', otp.value)
+    formData.append('otp_code', deviceListOtp.value)
     formData.append('device_token', deviceToken.value)
     
-    // Gửi mảng device tokens cần remove
     selectedDevices.value.forEach(token => {
       formData.append('remove_device_tokens[]', token)
     })
@@ -429,12 +434,12 @@ const handleRemoveDevices = async () => {
     const response = await axiosInstance.post('/api/v1/verify-remove-device', formData)
     
     if (response.data.success) {
+      deviceListOtp.value = '' // Clear OTP khi verify thành công
       closeDeviceListModal()
-      // Retry login
       handleLogin()
     }
   } catch (error) {
-    otpStatus.value = {
+    deviceListOtpStatus.value = {
       type: 'error',
       message: error.response?.data?.message === 'Invalid OTP'
         ? 'Mã OTP không chính xác. Vui lòng kiểm tra lại.'

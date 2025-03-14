@@ -40,5 +40,3 @@ yarn dev
    - Xem danh sách thiết bị đã kích hoạt
    - Gỡ bỏ một hoặc nhiều thiết bị
    - Xác thực OTP khi gỡ bỏ thiết bị
-
-## Cấu trúc project
