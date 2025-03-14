@@ -13,7 +13,7 @@ cd login-demo
 2. Cài đặt dependencies
 ```bash
 npm install
-
+```
 ## Chạy ứng dụng
 
 ### Development
