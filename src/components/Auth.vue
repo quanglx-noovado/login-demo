@@ -203,7 +203,6 @@ const email = ref('')
 const password = ref('')
 const otp = ref('')
 const currentStep = ref('login')
-const deviceInfo = ref(null)
 const deviceToken = ref('')
 const isLoading = ref(false)
 const errorMessage = ref('')
@@ -216,6 +215,7 @@ const showDeviceListModal = ref(false)
 const selectedDevices = ref<string[]>([])
 const showNewDeviceOtpInput = ref(false)
 const activeDevices = ref([])
+const deviceInfo = ref(null)
 
 // Tách riêng các biến cho modal new device
 const newDeviceOtpStatus = ref<{ type: 'success' | 'error', message: string } | null>(null)
@@ -234,6 +234,11 @@ const router = useRouter()
 onMounted(async () => {
   deviceInfo.value = await DeviceService.getDeviceInfo()
 })
+
+// Thêm hàm để lấy user agent
+const getUserAgent = () => {
+  return window.navigator.userAgent
+}
 
 // Helper để reset error message
 const clearError = () => {
@@ -271,7 +276,8 @@ const handleLogin = async () => {
     formData.append('email', email.value)
     formData.append('password', password.value)
     formData.append('device_name', deviceInfo.value.device_name)
-    formData.append('finger_print', deviceInfo.value.device_id)
+    formData.append('user_agent', getUserAgent())
+    formData.append('platform', 'web')
 
     const response = await axiosInstance.post('/api/v1/login', formData)
 
@@ -373,7 +379,8 @@ const handleVerifyOtp = async () => {
       loginFormData.append('email', email.value)
       loginFormData.append('password', password.value)
       loginFormData.append('device_name', deviceInfo.value.device_name)
-      loginFormData.append('finger_print', deviceInfo.value.device_id)
+      loginFormData.append('user_agent', getUserAgent())
+      loginFormData.append('platform', 'web')
 
       try {
         const loginResponse = await axiosInstance.post('/api/v1/login', loginFormData)
