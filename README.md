@@ -6,21 +6,19 @@ Hệ thống xác thực đa thiết bị với Vue 3 và TypeScript.
 
 1. Clone repository
 ```bash
-git clone <repository-url>
-cd <project-folder>
+git clone git@github.com:quanglx-noovado/login-demo.git
+cd login-demo
 ```
 
 2. Cài đặt dependencies
 ```bash
 npm install
-
+```
 ## Chạy ứng dụng
 
 ### Development
 ```bash
 npm run dev
-# hoặc
-yarn dev
 ```
 Ứng dụng sẽ chạy tại `http://localhost:5173`
 
